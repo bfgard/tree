@@ -13,27 +13,49 @@ public class DecisionTree extends SupervisedLearner {
 
 	//ArrayList<ArrayList<Node>> tree;
 	ArrayList<Node> layer;
+	List<Double> commonElement;
 	Node root;
-	Map<Integer, Set<Double>> outputClasses;
 	
 	public DecisionTree() {
 		layer = new ArrayList<Node>();
 		root = new Node();
-		outputClasses = new HashMap<Integer, Set<Double>>();
+		commonElement = new ArrayList<Double>();
 		//tree = new ArrayList<ArrayList<Node>>();
 	}
 
 	@Override
 	public void train(Matrix features, Matrix labels) throws Exception {
 		
-		constructOutputs(features);
-		createTree(features, labels, root, 0);
+		Map<Integer, Set<Double>> outClass = constructOutputs(features);
+		cleanData(features);
+		createTree(features, labels, root, 0, outClass);
 		//printTree(root);
 	}
 	
-	public void createTree(Matrix features, Matrix labels, Node currNode, int childNum) {
+	public void cleanData(Matrix features) {
+		int size = features.m_data.size();
+		for (int i = 0; i < size; i++) {
+			double[] row = features.m_data.get(i);
+			int length = row.length;
+			for(int j = 0; j < length; j++) {
+				if(row[j] != Double.MAX_VALUE) {
+					continue;
+				} else {
+					features.set(i, j, features.mostCommonValue(j));
+				}
+			}
+		}
+		
+		int length = features.m_data.get(0).length;
+		for(int j = 0; j < length; j++) {
+			commonElement.add(features.mostCommonValue(j));
+		}
+	}
+	
+	public void createTree(Matrix features, Matrix labels, Node currNode, int childNum, Map<Integer, Set<Double>> outputClasses) {
 		int rows = features.rows();
 		int cols = features.cols();
+		
 		// find the possible classification values
 		Set<Double> outputs = new TreeSet<Double>();
 		List<double[]> tempLabels = labels.m_data;
@@ -66,7 +88,6 @@ public class DecisionTree extends SupervisedLearner {
 			for (int j = 0; j < rows; j++) {
 				// create a list of all the values and a set of possible outputs
 				double val = features.m_data.get(j)[i];
-				featureVals.add(val);
 				featureData.add(val);
 			}
 			columnMatrix.add(featureData);
@@ -75,8 +96,9 @@ public class DecisionTree extends SupervisedLearner {
 			double gain = calculateGain(attr, outputs, targets, info);
 			// update the max gain and max index
 			maxIndex = (gain > maxGain) ? i : maxIndex;
-			maxGain = (gain > maxGain) ? gain : maxGain;
+			maxGain = (gain > maxGain) ? gain : maxGain;	
 		}
+		
 		
 		Node split = layer.get(maxIndex);
 		split.setParent(currNode.getParent());
@@ -85,11 +107,12 @@ public class DecisionTree extends SupervisedLearner {
 		if (currNode.getParent()==null) {
 			root = split;
 		} else {
-			currNode.getParent().getChildren().set(childNum, split);
+			split.getParent().getChildren().set(childNum, split);
 		}
-		currNode = split;
 		
-		//updataOutputClasses(maxIndex);
+		currNode = split;
+		Map<Integer, Set<Double>> outCopy = new HashMap<Integer, Set<Double>>();
+		outCopy = updateOutputClasses(maxIndex, outputClasses);
 		layer = new ArrayList<Node>();
 		
 		if(columnMatrix.size() != 0) {
@@ -105,12 +128,12 @@ public class DecisionTree extends SupervisedLearner {
 		
 		int i = 0;
 		for(Node child : split.getChildren()) {
-			if(child.getFeatures().m_data.size()==0) {
+			if(child.getFeatures().cols()==0 || child.getFeatures().rows()==0) {
 				double common = child.getParent().getLabels().mostCommonValue(0);
 				split.setOut(common);
 				continue;
 			}
-			createTree(child.getFeatures(), child.getLabels(), child, i);
+			createTree(child.getFeatures(), child.getLabels(), child, i, outCopy);
 			i++;
 		}
 	}
@@ -151,7 +174,8 @@ public class DecisionTree extends SupervisedLearner {
 		split.setChildren(children);		
 	}
 	
-	public void constructOutputs(Matrix features) {
+	public Map<Integer, Set<Double>> constructOutputs(Matrix features) {
+		Map<Integer, Set<Double>> outputClasses = new HashMap<Integer, Set<Double>>();
 		int size = features.m_enum_to_str.size();
 		for (int i = 0; i < size; i++) {
 			Set<Double> featureVals = new LinkedHashSet<Double>();
@@ -160,7 +184,21 @@ public class DecisionTree extends SupervisedLearner {
 				featureVals.add((double)j);
 			}
 			outputClasses.put(i, featureVals);
-		}	
+		}
+		return outputClasses;
+	}
+	
+	public Map<Integer, Set<Double>> updateOutputClasses(int index, Map<Integer, Set<Double>> outClass) {
+		Map<Integer, Set<Double>> outCopy = new HashMap<Integer, Set<Double>>();
+		outCopy.putAll(outClass);
+		int size = outClass.size();
+		outCopy.remove(index);
+		for (int i = index+1; i < size; i++) {
+			Set<Double> tempSet = outCopy.get(i);
+			outCopy.remove(i);
+			outCopy.put(i-1, tempSet);
+		}
+		return outCopy;
 	}
 
 	public double findMostCommon(List<Double> outputs, Set<Double> vals) {
@@ -215,9 +253,11 @@ public class DecisionTree extends SupervisedLearner {
 
 	@Override
 	public void predict(double[] features, double[] labels) throws Exception {
-		// iterate over all the features
-		// if any of the features are missing then fill thme with the most common value
-		
+		int length = features.length;
+		for(int i = 0; i < length; i++) {
+			if(features[i] == Double.MAX_VALUE)
+				features[i] = commonElement.get(i);
+		}
 		treePredict(features, labels, root);
 		//System.out.format("%f %f %f %f %f\n", features[0], features[1], features[2], features[3], labels[0]);
 	}
