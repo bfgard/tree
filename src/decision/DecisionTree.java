@@ -56,6 +56,7 @@ public class DecisionTree extends SupervisedLearner {
 		int rows = features.rows();
 		int cols = features.cols();
 		
+			
 		// find the possible classification values
 		Set<Double> outputs = new TreeSet<Double>();
 		List<double[]> tempLabels = labels.m_data;
@@ -68,7 +69,11 @@ public class DecisionTree extends SupervisedLearner {
 			targets.add(val);
 		}
 		// calculate the info of the output class
-		double info = calculateInfo(outputs, targets);
+		double info = 0;
+		if(rows != 0 && cols != 0) {
+			info = calculateInfo(outputs, targets);
+		}
+		
 		//System.out.println(info);
 		if(info == 0) {
 			currNode.setOut(tempLabels.get(0)[0]);
@@ -128,7 +133,7 @@ public class DecisionTree extends SupervisedLearner {
 		
 		int i = 0;
 		for(Node child : split.getChildren()) {
-			if(child.getFeatures().cols()==0 || child.getFeatures().rows()==0) {
+			if(child.getFeatures().m_data.size()==0) {
 				double common = child.getParent().getLabels().mostCommonValue(0);
 				split.setOut(common);
 				continue;
