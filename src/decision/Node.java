@@ -72,6 +72,14 @@ public class Node {
 		children = chldrn.stream().collect(Collectors.toList());;
 	}
 	
+	public void setChildList(List<Node> chldrn) {
+		children = chldrn;
+	}
+	
+	public void deleteChildren() {
+		children = null;
+	}
+	
 	public List<Node> getChildren() {
 		return children;
 	}

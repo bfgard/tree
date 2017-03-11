@@ -28,8 +28,119 @@ public class DecisionTree extends SupervisedLearner {
 		
 		Map<Integer, Set<Double>> outClass = constructOutputs(features);
 		cleanData(features);
+		//int validSize = (int)(0.1 * features.rows());
+		//Matrix validFeatures = new Matrix(features, 0, 0, validSize, features.cols()-1);
+		//Matrix validLabels = new Matrix(labels, 0, labels.cols()-1, validSize, 1);
+		//features = new Matrix(features, validFeatures.rows(), 0, features.rows() - validSize, features.cols()-1);
+		//labels = new Matrix(labels, validLabels.rows(), labels.cols()-1, labels.rows() - validSize, 1);
+		
 		createTree(features, labels, root, 0, outClass);
+		
+		//reduceErrorPrune(features, labels, validFeatures, validLabels);
+		
 		//printTree(root);
+	}
+	
+	public void reduceErrorPrune(Matrix features, Matrix labels, Matrix validF, Matrix validL) throws Exception {
+		int originalDepth = depth(root,0);
+		int originalNodes = nodes(root,0);
+		
+		System.out.format("Tree Depth: %d Number of Nodes: %d\n", originalDepth, originalNodes);
+		double error = this.validate(validF, validL);
+		System.out.format("Original accuracy: %f\n", 1-error);
+		double currentError = error;
+		while(currentError <= error) {
+			List<Node> nodes = listNodes(new ArrayList<Node>(), root);
+			nodes.remove(0);
+			double bestError = Double.MAX_VALUE;
+			Node remove = null;
+			for(Node currNode : nodes) {
+				List<Node> children = currNode.getChildren();
+				double output = currNode.getOutput();
+				currNode.deleteChildren();
+				currNode.setOut(labels.mostCommonValue(0));
+				
+				double validError = validate(validF, validL);
+				if(validError < bestError) {
+					bestError = validError;
+					remove = currNode;
+				}
+				currNode.setOut(output);
+				currNode.setChildList(children);
+			}
+			System.out.println(bestError);
+			System.out.println(currentError);
+			if(bestError < currentError) {
+				currentError = bestError;
+				remove.deleteChildren();
+				remove.setOut(remove.getLabels().mostCommonValue(0));
+				System.out.println("Removed node "+ currentError);
+			}
+			else {
+				break;
+			}
+
+        }
+        int newNodes = nodes(root, 0);
+        int newDepth = depth(root, 0);
+        System.out.format("Number of nodes is: %d total depth %d\n", newNodes,newDepth);
+		}
+
+	
+	public int depth(Node node, int depth) {
+		if(node.getChildren()==null)
+			return depth + 1;
+		int max = 0;
+		for(Node child: node.getChildren()) {
+			int d = depth(child, depth);
+			if(d > max)
+				max = d;
+		}
+		return max + 1;
+	}
+	
+	public List<Node> listNodes(List<Node> allNodes, Node n) {
+		allNodes.add(n);
+		if(n.getChildren()==null) {
+			allNodes.remove(n);
+			return allNodes;
+		}
+		for(Node child: n.getChildren()) {
+			allNodes.addAll(listNodes(new ArrayList<Node>(), child));
+		}
+		return allNodes;
+	}
+	
+	public int nodes(Node node, int numNodes) {
+		numNodes++;
+		if(node.getChildren()!=null) {
+			for(Node child: node.getChildren()) {
+				numNodes = nodes(child, numNodes);
+			}
+		}
+		return numNodes;
+	}
+	
+	public double calcMajorityOutput(double index, Matrix features, Matrix labels) {
+		ArrayList<double[]> data = features.m_data;
+		int size = data.size();
+		ArrayList<double[]> targets = labels.m_data;
+		Set<Double> values = new TreeSet<Double>();
+		ArrayList<Double> outputs = new ArrayList<Double>();
+		for(int i = 0; i < size; i++) {
+			values.add(targets.get(i)[0]);
+			outputs.add(data.get(i)[(int)index]);
+		}
+		double maxFreq = -1;
+		double maxOut = -1;
+		for(Double outVal: values) {
+			double frequency = Collections.frequency(outputs, outVal);
+			if(frequency > maxFreq) {
+				maxFreq = frequency;
+				maxOut = outVal;
+			}
+		}
+		return maxOut;
 	}
 	
 	public void cleanData(Matrix features) {
@@ -306,7 +417,20 @@ public class DecisionTree extends SupervisedLearner {
 
 	@Override
 	public double validate(Matrix features, Matrix labels) throws Exception {
-		// TODO Auto-generated method stub
-		return 0;
+		int labelValues = labels.valueCount(0);
+		int correctCount = 0;
+		double[] prediction = new double[1];
+		for(int i = 0; i < features.rows(); i++)
+		{
+			double[] feat = features.row(i);
+			int targ = (int)labels.get(i, 0);
+			if(targ >= labelValues)
+				throw new Exception("The label is out of range");
+			predict(feat, prediction);
+			int pred = (int)prediction[0];
+			if(pred == targ)
+				correctCount++;
+		}
+		return (double)(features.rows() - correctCount) / features.rows();
 	}
 }
