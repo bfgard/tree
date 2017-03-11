@@ -41,15 +41,28 @@ public class DecisionTree extends SupervisedLearner {
 				if(row[j] != Double.MAX_VALUE) {
 					continue;
 				} else {
-					features.set(i, j, features.mostCommonValue(j));
+					features.set(i, j, mean(j,features));
 				}
 			}
 		}
 		
 		int length = features.m_data.get(0).length;
 		for(int j = 0; j < length; j++) {
-			commonElement.add(features.mostCommonValue(j));
+			commonElement.add(mean(j,features));
 		}
+	}
+	
+	public double mean(int index, Matrix features) {
+		double sum = 0.0;
+		int size = features.m_data.size();
+		double j = 0.0;
+		for (int i = 0; i < size; i++) {
+			if(features.m_data.get(i)[index] != Double.MAX_VALUE) {
+				sum += features.m_data.get(i)[index];
+				j++;
+			}
+		}
+		return Math.round(sum / j); 
 	}
 	
 	public void createTree(Matrix features, Matrix labels, Node currNode, int childNum, Map<Integer, Set<Double>> outputClasses) {
